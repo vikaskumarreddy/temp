@@ -92,7 +92,7 @@ async function loadMappings() {
 
   let html = "<b>Request Mappings:</b><br><br>";
 
-  const mappings = data.contexts.application.mappings.dispatcherServlets.dispatcherServlet;
+  const mappings = data.contexts.pub-sub.mappings.dispatcherServlets.dispatcherServlet;
 
   mappings.forEach(m => {
     if (m.predicate && m.handler) {
