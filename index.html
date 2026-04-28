@@ -1,23 +1,48 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Spring Actuator Bean Visualizer</title>
+  <title>Spring Actuator Visualizer</title>
   <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
   <style>
-    body { font-family: Arial; }
-    #network { width: 100%; height: 90vh; border: 1px solid #ccc; }
+    body { font-family: Arial; margin:0; }
+    .container { display: flex; height: 100vh; }
+    .panel { flex: 1; border: 1px solid #ccc; overflow: auto; }
+    #network { height: 100%; }
+    #memory, #mappings { padding: 10px; font-size: 12px; }
+    .header { background:#f5f5f5; padding:10px; font-weight:bold; }
+    button { margin: 5px; }
   </style>
 </head>
 <body>
 
-<h2>Spring Boot Bean Dependency Visualizer</h2>
-<button onclick="loadBeans()">Load Beans</button>
-<div id="network"></div>
+<div class="header">
+  Spring Boot Actuator Visualizer
+  <button onclick="loadBeans()">Beans Graph</button>
+  <button onclick="loadMemory()">Memory</button>
+  <button onclick="loadMappings()">Mappings</button>
+</div>
+
+<div class="container">
+  <div class="panel">
+    <div class="header">Bean Dependency Graph</div>
+    <div id="network"></div>
+  </div>
+
+  <div class="panel">
+    <div class="header">Memory Analysis</div>
+    <div id="memory"></div>
+  </div>
+
+  <div class="panel">
+    <div class="header">Dispatcher Mappings</div>
+    <div id="mappings"></div>
+  </div>
+</div>
 
 <script>
 async function loadBeans() {
-  const response = await fetch('http://localhost:8090/actuator/beans');
-  const data = await response.json();
+  const res = await fetch('http://localhost:8090/actuator/beans');
+  const data = await res.json();
 
   const nodes = [];
   const edges = [];
@@ -25,30 +50,57 @@ async function loadBeans() {
   const contexts = data.contexts;
   for (const ctx in contexts) {
     const beans = contexts[ctx].beans;
-
     for (const beanName in beans) {
-      nodes.push({ id: beanName, label: beanName });
-
-      const deps = beans[beanName].dependencies || [];
-      deps.forEach(dep => {
-        edges.push({ from: beanName, to: dep });
-      });
+      if (!beanName.startsWith("org.springframework")) {
+        nodes.push({ id: beanName, label: beanName });
+        const deps = beans[beanName].dependencies || [];
+        deps.forEach(dep => {
+          edges.push({ from: beanName, to: dep });
+        });
+      }
     }
   }
 
-  const container = document.getElementById('network');
-  const networkData = {
-    nodes: new vis.DataSet(nodes),
-    edges: new vis.DataSet(edges)
-  };
+  const network = new vis.Network(
+    document.getElementById('network'),
+    { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) },
+    { physics: { stabilization: true } }
+  );
 
-  const options = {
-    layout: { improvedLayout: true },
-    physics: { stabilization: true },
-    nodes: { shape: 'dot', size: 10 }
-  };
+  network.on("click", function (params) {
+    if (params.nodes.length) {
+      alert("Bean: " + params.nodes[0]);
+    }
+  });
+}
 
-  new vis.Network(container, networkData, options);
+async function loadMemory() {
+  const res = await fetch('http://localhost:8090/actuator/metrics/jvm.memory.used');
+  const data = await res.json();
+
+  let html = "<b>JVM Memory Used:</b><br><br>";
+  data.measurements.forEach(m => {
+    html += m.statistic + ": " + m.value + "<br>";
+  });
+
+  document.getElementById('memory').innerHTML = html;
+}
+
+async function loadMappings() {
+  const res = await fetch('http://localhost:8090/actuator/mappings');
+  const data = await res.json();
+
+  let html = "<b>Request Mappings:</b><br><br>";
+
+  const mappings = data.contexts.application.mappings.dispatcherServlets.dispatcherServlet;
+
+  mappings.forEach(m => {
+    if (m.predicate && m.handler) {
+      html += `<div><b>${m.predicate}</b><br>${m.handler}</div><hr>`;
+    }
+  });
+
+  document.getElementById('mappings').innerHTML = html;
 }
 </script>
 
