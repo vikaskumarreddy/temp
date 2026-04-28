@@ -91,8 +91,8 @@ async function loadMappings() {
   const data = await res.json();
 
   let html = "<b>Request Mappings:</b><br><br>";
-
-  const mappings = data.contexts.pub-sub.mappings.dispatcherServlets.dispatcherServlet;
+  const ctx = data.contexts["pub-sub"]
+  const mappings = ctx.mappings.dispatcherServlets.dispatcherServlet;
 
   mappings.forEach(m => {
     if (m.predicate && m.handler) {
